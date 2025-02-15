@@ -39,14 +39,38 @@ export const chatbot = async (req, res) => {
     }
 
     try {
-        const lowercaseMessage = message.toLowerCase();
-        const sections = pdfContent.split(/\n(?=[A-Z][a-z])/);
+        const lowercaseMessage = normalizeText(message);
+        const sections = pdfContent.split(/\n(?=[A-Z¿][a-záéíóú]|¿Cómo funciona\?)/);
+
+        const availableMethods = [
+            "Modelado basado en conocimiento",
+            "Redes Neuronales Artificiales",
+            "Lógica Difusa",
+            "Algoritmos Genéticos",
+            "Modelos de Agentes Inteligentes",
+            "Machine Learning (Aprendizaje Automático)",
+            "Modelos de Optimización Matemática",
+            "Modelos de Sistemas Dinámicos",
+            "Modelado Basado en Casos",
+            "Modelos de Simulación",
+            "Modelos Híbridos"
+        ];
+
+        const requestedMethod = availableMethods.find(method =>
+            lowercaseMessage.includes(normalizeText(method))
+        );
+
+
 
         const getMethodDetails = (method) => {
-            const methodSection = sections.find(section => section.toLowerCase().includes(method.toLowerCase()));
-            if (!methodSection) {
+            const startIndex = sections.findIndex(section => section.toLowerCase().includes(method.toLowerCase()));
+
+            if (startIndex === -1) {
                 return "No se encontró información sobre este método.";
             }
+
+            // Tomar la sección actual + algunas posteriores para capturar toda la información relevante
+            const methodSection = sections.slice(startIndex, startIndex + 6).join("\n");
 
             const methodDetails = {
                 descripcion: '',
@@ -54,61 +78,84 @@ export const chatbot = async (req, res) => {
                 ventajas: '',
                 desventajas: '',
                 aplicaciones: '',
-                ejemplos: ''
+                ejemplos: '',
+                modelo: ''
             };
 
-            const lines = methodSection.split('\n').filter(line => line.trim() !== '');
+
+            const lines = methodSection.split('\n').map(line => line.trim()).filter(line => line !== '');
             let currentCategory = null;
 
             lines.forEach(line => {
-                const lineLower = line.toLowerCase();
+                // Normalizar la línea para quitar acentos y convertir a minúsculas
+                const normalizedLine = line
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, ""); // Quitar acentos
 
-                if (lineLower.includes('descripción')) {
+                // Eliminar espacios extra y caracteres no alfanuméricos al inicio
+                const cleanedLine = normalizedLine.replace(/[^a-z0-9áéíóúüñ]+/g, ' ').trim();
+
+                if (cleanedLine.startsWith('descripcion')) {
                     currentCategory = 'descripcion';
-                } else if (lineLower.includes('cómo funciona')) {
+                } else if (cleanedLine.startsWith('como funciona')) {
                     currentCategory = 'funcionamiento';
-                } else if (lineLower.includes('ventajas')) {
+                } else if (cleanedLine.startsWith('ventajas')) {
                     currentCategory = 'ventajas';
-                } else if (lineLower.includes('desventajas')) {
+                } else if (cleanedLine.startsWith('desventajas')) {
                     currentCategory = 'desventajas';
-                } else if (lineLower.includes('aplicaciones')) {
+                } else if (cleanedLine.startsWith('aplicaciones')) {
                     currentCategory = 'aplicaciones';
-                } else if (lineLower.includes('ejemplos')) {
+                } else if (cleanedLine.startsWith('ejemplos')) {
                     currentCategory = 'ejemplos';
                 }
 
                 if (currentCategory) {
-                    methodDetails[currentCategory] += ` ${line}`;
+                    methodDetails[currentCategory] += ` ${line}`.trim();
+                } else {
+                    const modeloCompleto = lines
+                    const modelo = modeloCompleto.join(', ')
+                    methodDetails.modelo = modelo;
                 }
             });
 
             return methodDetails;
         };
 
-        // Buscar método específico
-        const requestedMethod = lowercaseMessage.includes('modelado basado en casos') ? 'Modelado Basado en Casos' : null;
-
         if (requestedMethod) {
+
             const methodDetails = getMethodDetails(requestedMethod);
-            
+
+
             let reply;
             if (lowercaseMessage.includes("ventajas")) {
-                reply = methodDetails.ventajas.trim() || "No se encontraron ventajas específicas para este método.";
+                reply = methodDetails.ventajas.trim()
+                    ? `Aquí tienes algunas ventajas de ${requestedMethod}: ${methodDetails.ventajas.trim()}`
+                    : `No encontré ventajas específicas para ${requestedMethod}, pero en general, este método puede tener beneficios dependiendo del contexto en el que se use.`;
             } else if (lowercaseMessage.includes("desventajas")) {
-                reply = methodDetails.desventajas.trim() || "No se encontraron desventajas específicas para este método.";
+                reply = methodDetails.desventajas.trim()
+                    ? `Algunas desventajas de ${requestedMethod} son: ${methodDetails.desventajas.trim()}`
+                    : `No encontré desventajas específicas para ${requestedMethod}, pero como todo método, puede tener limitaciones según su aplicación.`;
             } else if (lowercaseMessage.includes("aplicaciones")) {
-                reply = methodDetails.aplicaciones.trim() || "No se encontraron aplicaciones específicas para este método.";
+                reply = methodDetails.aplicaciones.trim()
+                    ? `Este método se usa en varios casos, como: ${methodDetails.aplicaciones.trim()}`
+                    : `No tengo información exacta sobre las aplicaciones de ${requestedMethod}, pero normalmente se usa en contextos donde se requiere manejar incertidumbre o datos imprecisos.`;
             } else if (lowercaseMessage.includes("ejemplos")) {
-                reply = methodDetails.ejemplos.trim() || "No se encontraron ejemplos específicos para este método.";
+                reply = methodDetails.ejemplos.trim()
+                    ? `Aquí tienes algunos ejemplos de ${requestedMethod} en acción: ${methodDetails.ejemplos.trim()}`
+                    : `No encontré ejemplos específicos, pero si me das más contexto, puedo ayudarte a encontrar algunos casos donde se aplique.`;
             } else if (lowercaseMessage.includes("cómo funciona")) {
-                reply = methodDetails.funcionamiento.trim() || "No se encontró información sobre cómo funciona este método.";
+                reply = methodDetails.funcionamiento.trim()
+                    ? `Así funciona ${requestedMethod}: ${methodDetails.funcionamiento.trim()}`
+                    : `No tengo detalles exactos sobre cómo funciona ${requestedMethod}, pero generalmente implica el uso de reglas lógicas y matemáticas para manejar datos inciertos.`;
             } else {
-                reply = Object.entries(methodDetails)
-                    .filter(([_, value]) => value.trim() !== '')
-                    .map(([key, value]) => `${key.charAt(0).toUpperCase() + key.slice(1)}: ${value.trim()}`)
-                    .join("\n\n");
+                reply = methodDetails.modelo.trim()
+                    ? `Aquí tienes una explicación de ${requestedMethod}: ${methodDetails.modelo.trim()}`
+                    : `Parece que no tengo información detallada sobre ${requestedMethod}, pero dime qué necesitas saber y te ayudaré.`;
             }
+
             return res.json({ reply });
+
         }
 
         // Buscar sección relevante si no se encontró un método específico
@@ -121,12 +168,16 @@ export const chatbot = async (req, res) => {
         if (!relevantSection) {
             return res.json({ reply: "Lo siento, no encontré información relevante en el PDF para responder a tu pregunta." });
         }
-
-        return res.json({ reply: relevantSection.trim() });
+        return res.json({ reply: relevantSection.trim() + 'Sicawn' });
 
     } catch (error) {
         return res.status(500).json({ reply: "Error en el chatbot: " + error.message });
     }
 };
 
-
+const normalizeText = (text) => {
+    return text
+        .normalize("NFD") // Descompone los caracteres con acentos en sus partes base
+        .replace(/[\u0300-\u036f]/g, "") // Elimina los signos diacríticos (acentos)
+        .toLowerCase(); // Convierte el texto a minúsculas
+};
