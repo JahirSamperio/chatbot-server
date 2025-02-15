@@ -168,7 +168,7 @@ export const chatbot = async (req, res) => {
         if (!relevantSection) {
             return res.json({ reply: "Lo siento, no encontré información relevante en el PDF para responder a tu pregunta." });
         }
-        return res.json({ reply: relevantSection.trim() + 'Sicawn' });
+        return res.json({ reply: 'Modelo no encontrado, intenta con otro' });
 
     } catch (error) {
         return res.status(500).json({ reply: "Error en el chatbot: " + error.message });
